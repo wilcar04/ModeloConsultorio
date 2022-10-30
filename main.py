@@ -69,7 +69,7 @@ class CitaEcografia(Cita):
         super().__init__(fecha, hora, cedula_paciente)
         self.tipo_ecografia: str = tipo_ecografia
 
-    def convertir_archivo(self, archivo):
+    def convertir_archivo(self, ruta_archivo):
         pass
 
     def __str__(self):
@@ -81,7 +81,7 @@ class CitaMedica(Cita):
     def __init__(self, fecha, hora, cedula_paciente):
         super().__init__(fecha, hora, cedula_paciente)
 
-    def convertir_archivo(self, archivo):
+    def convertir_archivo(self, ruta_archivo):
         pass
 
     def __str__(self):
@@ -90,18 +90,23 @@ class CitaMedica(Cita):
 
 class Paciente:
 
-    def __init__(self, nombre, cedula, sexo, fecha_nacimiento, celular):
+    def __init__(self, nombre: str, cedula: str, sexo: str, fecha_nacimiento: datetime.date, celular: str):
         self.nombre: str = nombre
         self.cedula: str = cedula
         self.sexo: str = sexo
         self.fecha_nacimiento: datetime.date = fecha_nacimiento
-        self.edad: int =
+        self.edad: int = self.calcular_edad(fecha_nacimiento)
         self.celular: str = celular
         self.cita: Optional[Cita] = None
         self.historial: list[Historial] = []
 
     def __str__(self):
         return f"Nombre: {self.nombre} Cedula: {self.cedula} Celular: {self.celular}"
+
+    @staticmethod
+    def calcular_edad(fecha_nacimiento: datetime.date) -> int:
+        fecha_actual = datetime.date.today()
+        return int(fecha_actual.strftime("%Y")) - int(fecha_nacimiento.strftime("%Y"))
 
     def paciente_tiene_cita(self) -> bool:
         return self.cita is not None
@@ -115,10 +120,10 @@ class Paciente:
     def eliminar_cita(self):
         self.cita = None
 
-    def convertir_archivo(self, archivo) -> Historial:
-        self.cita.convertir_archivo(archivo)
+    def convertir_archivo(self, ruta_archivo) -> Historial:
+        return self.cita.convertir_archivo(ruta_archivo)
 
-    def agregar_historia(self, historial: Historial):
+    def agregar_historial(self, historial: Historial):
         self.historial.append(historial)
 
     def cita_atendida(self):
@@ -205,9 +210,6 @@ class Agenda:
     def obtener_horas(self, fecha: datetime.date) -> list[datetime.time]:
         return self.agendas_diarias[fecha].obtener_horas()
 
-    def lista_citas_sin_confirmar(self):
-        pass
-
 
 class Consultorio:
     HORA_INICIAL = 9
@@ -277,23 +279,18 @@ class Consultorio:
                 agenda_organizada.append(None)
         return tuple(agenda_organizada)
 
-    def lista_organizada_disponibilidad(self, lista_horas: list[datetime.time]) -> list[bool]:
-        lista_disponibilidad = []
-        for hora in range(self.HORA_INICIAL, self.HORA_FINAL + 1):
-            for hora_cita in lista_horas:
-                if hora_cita.hour == hora:
-                    lista_disponibilidad.append(False)
-                    lista_horas.remove(hora_cita)
-                    break
-            else:
-                lista_disponibilidad.append(True)
-        return lista_disponibilidad
-
     # Requisitos de programa:
 
-    def registrar_ususario(self, nombre: str, cedula: str, sexo: str, fecha_nacimiento: list[str], celular: str):
+    def registrar_ususario(self, nombre: str, cedula: str, sexo: str, fecha_nacimiento: str, celular: str):
         if not self.usuario_existe(cedula):
-            paciente = Paciente(nombre, cedula, sexo, fecha_nacimiento, celular)
+            formato_fecha = None
+            try:
+                lista_fecha = fecha_nacimiento.split("/")
+                formato_fecha = datetime.date(int(lista_fecha[2]), int(lista_fecha[1]), int(lista_fecha[0]))
+            except ValueError:
+                # Error: La fecha de nacimiento ingresada no es válida
+                pass
+            paciente = Paciente(nombre, cedula, sexo, formato_fecha, celular)
             self.pacientes[cedula] = paciente
         else:
             # Error: Usuario ya registrado
@@ -353,8 +350,8 @@ class Consultorio:
             paciente = self.pacientes[cedula]
             if paciente.paciente_tiene_cita():
                 (fecha, hora) = paciente.obtener_fecha_hora_de_cita()
-                paciente.eliminar_cita()
                 self.agenda.eliminar_cita(fecha, hora)
+                paciente.eliminar_cita()
             else:
                 # Error: El paciente no tiene cita
                 pass
@@ -362,12 +359,12 @@ class Consultorio:
             # Error: Usuario no ha sido registrado
             pass
 
-    def atender_cita(self, cedula: str, archivo: str):
+    def atender_cita(self, cedula: str, ruta_archivo: str):
         if self.usuario_existe(cedula):
             paciente = self.pacientes[cedula]
             if paciente.paciente_tiene_cita():
-                historial = paciente.convertir_archivo(archivo)
-                paciente.agregar_historia(historial)
+                historial = paciente.convertir_archivo(ruta_archivo)
+                paciente.agregar_historial(historial)
                 paciente.cita_atendida()
             else:
                 # Error: El paciente no tiene cita
